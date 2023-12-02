@@ -1,6 +1,6 @@
 {
   "root": true,
-  "extends": "../../.eslintrc.base.json",
+  "extends": "../../.eslintrc.json",
   "parserOptions": {
     "project": ["./examples/js-plugin-cache/tsconfig.json"]
   },

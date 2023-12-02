@@ -1,5 +1,5 @@
 {
   "root": true,
-  "extends": "../../.eslintrc.base.json",
+  "extends": "../../.eslintrc.json",
   "rules": {}
 }

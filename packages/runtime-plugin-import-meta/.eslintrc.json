@@ -1,6 +1,6 @@
 {
   "root": true,
-  "extends": "../../.eslintrc.base.json",
+  "extends": "../../.eslintrc.json",
   "parserOptions": {
     "project": ["./packages/runtime-plugin-import-meta/tsconfig.json"]
   },
