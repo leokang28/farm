@@ -1,5 +1,11 @@
 # @farmfe/runtime
 
+## 0.8.5
+
+### Patch Changes
+
+- 65c742c: update template script && update runtime log
+
 ## 0.8.4
 
 ### Patch Changes

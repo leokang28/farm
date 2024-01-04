@@ -1,5 +1,11 @@
 # @farmfe/js-plugin-dts
 
+## 0.3.1
+
+### Patch Changes
+
+- e4c9f81: Break change: reset config and configResolved hooks hook functionality and structure
+
 ## 0.3.0
 
 ### Minor Changes

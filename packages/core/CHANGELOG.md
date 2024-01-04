@@ -1,5 +1,16 @@
 # @farmfe/core
 
+## 0.14.19
+
+### Patch Changes
+
+- e4c9f81: Break change: reset config and configResolved hooks hook functionality and structure
+- e91a088: resolve condition orderly
+- 78c1957: support renderResourcePot/finalizeResources/augmentResourceHash/renderStart js hook
+- 8846d06: Normalize js plugin hooks name
+- Updated dependencies [65c742c]
+  - @farmfe/runtime@0.8.5
+
 ## 0.14.18
 
 ### Patch Changes

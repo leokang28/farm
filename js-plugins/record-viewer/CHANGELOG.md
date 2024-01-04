@@ -1,5 +1,12 @@
 # @farmfe/js-plugin-record-viewer
 
+## 2.0.1
+
+### Patch Changes
+
+- e4c9f81: Break change: reset config and configResolved hooks hook functionality and structure
+- 8846d06: Normalize js plugin hooks name
+
 ## 2.0.0
 
 ### Major Changes
