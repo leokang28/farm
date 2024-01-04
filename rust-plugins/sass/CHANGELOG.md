@@ -1,5 +1,17 @@
 # @farmfe/plugin-sass
 
+## 0.3.5
+
+### Patch Changes
+
+- b181bb1c: support linux-x64-musl
+
+## 0.3.4
+
+### Patch Changes
+
+- cfc5cfa2: Bump version as core changed
+
 ## 0.3.3
 
 ### Patch Changes

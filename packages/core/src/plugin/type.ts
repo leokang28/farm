@@ -7,7 +7,12 @@ import {
   PluginTransformHookParam,
   PluginTransformHookResult
 } from '../../binding/index.js';
-import { DevServer } from '../index.js';
+import {
+  Compiler,
+  DevServer,
+  ResolvedUserConfig,
+  UserConfig
+} from '../index.js';
 
 export interface CompilationContextEmitFileParams {
   resolvedPath: string;
@@ -43,6 +48,73 @@ export interface CompilationContext {
   }[];
 }
 
+type ModuleId = string;
+
+export interface ResourcePot {
+  id: string;
+  name: string;
+  resourcePotType: string;
+  modules: ModuleId[];
+  meta: any;
+  entryModule?: ModuleId;
+  resources: string[];
+  moduleGroups: string[];
+  immutable: boolean;
+}
+
+interface RenderedModule {
+  id: ModuleId;
+  renderedContent: string;
+  renderedMap?: string;
+  renderedLength: number;
+  originalLength: number;
+}
+
+export interface ResourcePotInfo {
+  id: string;
+  resourcePotType: string;
+  content: string;
+  dynamicImports: string[];
+  exports: string[];
+  facadeModuleId?: string;
+  fileName: string;
+  implicitlyLoadedBefore: string[];
+  imports: string[];
+  importedBindings: Record<string, string[]>;
+  isDynamicEntry: boolean;
+  isEntry: boolean;
+  isImplicitEntry: boolean;
+  map?: string;
+  modules: Record<ModuleId, RenderedModule>;
+  moduleIds: ModuleId[];
+  name: string;
+  preliminaryFileName: string;
+  referencedFiles: string[];
+  ty: string;
+}
+export interface RenderResourcePotParams {
+  content: string;
+  resourcePotInfo: ResourcePotInfo;
+}
+export interface RenderResourcePotResult {
+  content: string;
+  sourceMap?: string;
+}
+
+export interface Resource {
+  name: string;
+  bytes: number[];
+  emitted: boolean;
+  resourceType: string;
+  origin: { type: 'ResourcePot' | 'Module'; value: string };
+  info?: ResourcePotInfo;
+}
+
+export type FinalizeResourcesHookParams = {
+  resourcesMap: Record<string, Resource>;
+  config: Config['config'];
+};
+
 type Callback<P, R> = (
   param: P,
   context?: CompilationContext,
@@ -53,22 +125,27 @@ type JsPluginHook<F, P, R> = { filters: F; executor: Callback<P, R> };
 export interface JsPlugin {
   name: string;
   priority?: number;
+  // apply?:
+  //   | 'serve'
+  //   | 'build'
+  //   | ((this: void, config: UserConfig, env: ConfigEnv) => boolean);
+  // config?: Callback<Config['config'], Config['config']>;
 
-  config?: Callback<Config['config'], Config['config']>;
+  config?: (config: UserConfig) => UserConfig | Promise<UserConfig>;
 
-  // config?: (
-  //   config: Config['config'],
-  //   configEnv?: ConfigEnv
-  // ) => Config['config'] | Promise<Config['config']>;
-
-  // configResolved?: (config: Config['config']) => void;
+  configResolved?: (config: ResolvedUserConfig) => void | Promise<void>;
 
   /**
    * runs in development mode only
    * @param server
    * @returns
    */
-  configDevServer?: (server: DevServer) => void;
+  configureDevServer?: (server: DevServer) => void | Promise<void>;
+  /**
+   * @param compiler
+   * @returns
+   */
+  configureCompiler?: (compiler: Compiler) => void | Promise<void>;
 
   buildStart?: { executor: Callback<Record<string, never>, void> };
 
@@ -102,6 +179,29 @@ export interface JsPlugin {
       { paths: [string, string][] },
       string[] | undefined | null | void
     >;
+  };
+
+  renderStart?: {
+    executor: Callback<Config['config'], void>;
+  };
+
+  renderResourcePot?: {
+    executor: Callback<RenderResourcePotParams, RenderResourcePotResult>;
+  };
+
+  augmentResourceHash?: {
+    executor: Callback<ResourcePotInfo, string>;
+  };
+
+  finalizeResources?: {
+    executor: Callback<
+      FinalizeResourcesHookParams,
+      FinalizeResourcesHookParams
+    >;
+  };
+
+  writeResources?: {
+    executor: Callback<FinalizeResourcesHookParams, void | Promise<void>>;
   };
 
   pluginCacheLoaded?: {

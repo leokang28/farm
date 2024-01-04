@@ -29,7 +29,7 @@ export const bindingPath: string;
 /// Parameter of the resolve hook
 export interface PluginResolveHookParam {
   /// the start location to resolve `source`, being [None] if resolving a entry or resolving a hmr update.
-  importer: { relativePath: string; queryString: string | null } | null;
+  importer: string | null;
   /// for example, [ResolveKind::Import] for static import (`import a from './a'`)
   kind: ResolveKind;
   /// resolvedPath. for example in index.ts (import App from "./App.vue")
@@ -119,10 +119,6 @@ export interface Config {
       targetEnv?: 'browser' | 'node';
       format?: 'cjs' | 'esm';
     };
-    env?: Record<string, any>;
-    envDir?: string;
-    envFiles?: string[];
-    envPrefix?: string | string[];
     resolve?: {
       extensions?: string[];
       alias?: Record<string, string>;
@@ -142,7 +138,6 @@ export interface Config {
       swcHelpersPath?: string;
       namespace?: string;
     };
-    configFilePath?: string;
     watch?: boolean | WatcherOptions;
     assets?: {
       include?: string[];

@@ -5,8 +5,9 @@ import {
   throwIncompatibleError
 } from './utils.js';
 import merge from 'lodash.merge';
+import { Logger } from '../../index.js';
 
-export function farmConfigToViteConfig(config: UserConfig): ViteUserConfig {
+export function farmUserConfigToViteConfig(config: UserConfig): ViteUserConfig {
   const vitePlugins = config.vitePlugins.map((plugin) => {
     if (typeof plugin === 'function') {
       return plugin().vitePlugin;
@@ -17,13 +18,13 @@ export function farmConfigToViteConfig(config: UserConfig): ViteUserConfig {
 
   const viteConfig: ViteUserConfig = {
     root: config.root,
-    base: config.compilation?.output?.publicPath,
+    base: config.compilation?.output?.publicPath ?? '/',
     publicDir: config.publicDir ?? 'public',
     mode: config.compilation?.mode,
     define: config.compilation?.define,
     // eslint-disable-next-line @typescript-eslint/ban-ts-comment
     // @ts-ignore ignore this error
-    command: config.compilation.mode === 'production' ? 'build' : 'serve',
+    command: config.compilation?.mode === 'production' ? 'build' : 'serve',
     resolve: {
       alias: config.compilation?.resolve?.alias,
       extensions: config.compilation?.resolve?.extensions,
@@ -53,7 +54,7 @@ export function farmConfigToViteConfig(config: UserConfig): ViteUserConfig {
       sourcemap: Boolean(config.compilation?.sourcemap),
       minify: config.compilation?.minify,
       cssMinify: config.compilation?.minify,
-      ssr: config.compilation.output?.targetEnv === 'node'
+      ssr: config.compilation?.output?.targetEnv === 'node'
       // other options are not supported in farm
     }
   };
@@ -63,7 +64,8 @@ export function farmConfigToViteConfig(config: UserConfig): ViteUserConfig {
 
 export function proxyViteConfig(
   viteConfig: ViteUserConfig,
-  pluginName: string
+  pluginName: string,
+  logger: Logger
 ): ViteUserConfig {
   return new Proxy(viteConfig, {
     get(target, key) {
@@ -88,11 +90,14 @@ export function proxyViteConfig(
         'isProduction',
         'css',
         'build',
+        'logger',
         // these fields are always undefined in farm
         // they are only used for compatibility
         'legacy',
         'optimizeDeps',
-        'ssr'
+        'ssr',
+        'logLevel',
+        'experimental'
       ];
 
       if (allowedKeys.includes(String(key))) {
@@ -107,7 +112,7 @@ export function proxyViteConfig(
             'dedupe'
           ];
 
-          return new Proxy(target.resolve, {
+          return new Proxy(target.resolve || {}, {
             get(resolveTarget, resolveKey) {
               if (typeof resolveKey !== 'string') {
                 return target[resolveKey as unknown as keyof typeof target];
@@ -145,7 +150,7 @@ export function proxyViteConfig(
             'origin'
           ];
 
-          return new Proxy(target.server, {
+          return new Proxy(target.server || {}, {
             get(serverTarget, serverKey) {
               if (typeof serverKey !== 'string') {
                 return target[serverKey as unknown as keyof typeof target];
@@ -174,7 +179,7 @@ export function proxyViteConfig(
         } else if (key === 'css') {
           const allowedCssKeys = ['devSourcemap'];
 
-          return new Proxy(target.css, {
+          return new Proxy(target.css || {}, {
             get(cssTarget, cssKey) {
               if (typeof cssKey !== 'string') {
                 return target[cssKey as unknown as keyof typeof target];
@@ -206,10 +211,11 @@ export function proxyViteConfig(
             'sourcemap',
             'minify',
             'cssMinify',
-            'ssr'
+            'ssr',
+            'watch'
           ];
 
-          return new Proxy(target.build, {
+          return new Proxy(target.build || {}, {
             get(buildTarget, buildKey) {
               if (typeof buildKey !== 'string') {
                 return target[buildKey as unknown as keyof typeof target];
@@ -234,6 +240,23 @@ export function proxyViteConfig(
               );
             }
           });
+        } else if (key === 'optimizeDeps') {
+          return new Proxy(target.optimizeDeps || {}, {
+            get(_, optimizeDepsKey) {
+              logger.warn(
+                `[vite-plugin] ${pluginName}: config "optimizeDeps" is not needed in farm, all of its options will be ignored. Current ignored option is: "${String(
+                  optimizeDepsKey
+                )}"`
+              );
+
+              if (optimizeDepsKey === 'esbuildOptions') {
+                return {};
+              }
+              return undefined;
+            }
+          });
+        } else if (key === 'logger') {
+          return logger;
         }
 
         return target[key as keyof typeof target];
@@ -336,6 +359,10 @@ export function viteConfigToFarmConfig(
     farmConfig.compilation.output.path = config.build.outDir;
     farmConfig.compilation.sourcemap = Boolean(config.build.sourcemap);
     farmConfig.compilation.minify = Boolean(config.build.minify);
+
+    if (config.build.ssr !== undefined) {
+      farmConfig.compilation.lazyCompilation = !config.build.ssr;
+    }
   }
 
   deleteUndefinedPropertyDeeply(farmConfig);

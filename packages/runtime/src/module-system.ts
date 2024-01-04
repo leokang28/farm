@@ -107,7 +107,7 @@ export class ModuleSystem {
         return externalModule;
       }
       // return a empty module if the module is not registered
-      console.log(`[farm] Module "${moduleId}" is not registered`);
+      console.log(`[Farm] Module "${moduleId}" is not registered`);
       return {};
       // throw new Error(`Module "${moduleId}" is not registered`);
     }
@@ -197,8 +197,6 @@ export class ModuleSystem {
 
   delete(moduleId: string): boolean {
     if (this.modules[moduleId]) {
-      this.cache[moduleId] && this.cache[moduleId].dispose?.();
-
       this.clearCache(moduleId);
       delete this.modules[moduleId];
       return true;

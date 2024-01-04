@@ -1,18 +1,9 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
 import { fileURLToPath } from 'node:url';
-import {
-  PersistentCacheBrand,
-  blue,
-  bold,
-  brandColor,
-  cyan,
-  debugColor,
-  green,
-  magenta,
-  red,
-  yellow
-} from './color.js';
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
+
+import { ColorFunction, PersistentCacheBrand, colors } from './color.js';
 import { Config } from '../../binding/index.js';
 
 type LogLevelNames = 'trace' | 'debug' | 'info' | 'warn' | 'error';
@@ -26,26 +17,25 @@ enum LogLevel {
 }
 
 export interface Logger {
-  trace(message: string | string[]): void;
-  debug(message: string | string[]): void;
-  info(message: string | string[]): void;
-  warn(message: string | string[]): void;
-  error(message: string | string[] | Error[], options?: ErrorOptions): void;
+  trace(message: string): void;
+  debug(message: string): void;
+  info(message: string): void;
+  warn(message: string): void;
+  error(message: string | Error, options?: ErrorOptions): void;
 }
 
 export interface ErrorOptions {
   exit?: boolean;
   e?: Error;
-  timestamp?: boolean;
   error?: Error;
 }
 interface LoggerOptions {
   name?: string;
-  brandColor?: any;
+  brandColor?: ColorFunction;
   exit?: boolean;
 }
 
-const LOGGING_METHOD = {
+const LOGGER_METHOD = {
   info: 'log',
   warn: 'warn',
   error: 'error'
@@ -73,83 +63,101 @@ export class DefaultLogger implements Logger {
 
   private brandPrefix(color?: (s: string | string[]) => string): void {
     const { name = 'Farm' } = this.options;
-    const formattedName = bold(name);
-    const formattedPrefix = bold(`[ ${formattedName} ]`);
+    const formattedName = colors.bold(name);
+    const formattedPrefix = colors.bold(`[ ${formattedName} ]`);
     this.prefix = color ? color(formattedPrefix) : formattedPrefix;
   }
 
   private logMessage(
     level: LogLevelNames,
-    message: any[],
-    color?: any,
+    message: string | Error,
+    color?: (s: string | string[]) => string,
     showBanner = true
   ): void {
     const loggerMethod =
-      level in LOGGING_METHOD
-        ? LOGGING_METHOD[level as keyof typeof LOGGING_METHOD]
+      level in LOGGER_METHOD
+        ? LOGGER_METHOD[level as keyof typeof LOGGER_METHOD]
         : 'log';
     if (this.levelValues[level] <= this.levelValues[level]) {
-      const loggerMessage = color
-        ? color(`${showBanner ? this.prefix : ''} ${message}`)
-        : `${showBanner ? this.prefix : ''} ${message}`;
+      const prefix = showBanner ? this.prefix + ' ' : '';
+      const loggerMessage = color ? color(prefix + message) : prefix + message;
       console[loggerMethod](loggerMessage);
     }
   }
 
-  trace(...message: any[]): void {
-    this.brandPrefix(green);
-    this.logMessage(LogLevel.Trace, message, magenta);
+  setPrefix(options: LoggerOptions): void {
+    if (options.name) {
+      this.options.name = options.name;
+      this.brandPrefix(options.brandColor);
+    }
   }
 
-  debug(...message: any[]): void {
-    this.brandPrefix(debugColor);
-    this.logMessage(LogLevel.Debug, message, blue);
+  trace(message: string): void {
+    this.brandPrefix(colors.green);
+    this.logMessage(LogLevel.Trace, message, colors.magenta);
   }
 
-  info(...message: any[]): void {
-    this.brandPrefix(brandColor);
+  debug(message: string): void {
+    this.brandPrefix(colors.debugColor);
+    this.logMessage(LogLevel.Debug, message, colors.blue);
+  }
+
+  info(message: string, iOptions?: LoggerOptions): void {
+    const options: LoggerOptions | undefined = iOptions;
+    if (options) {
+      this.setPrefix(options);
+    }
+    if (!options || !options.brandColor) {
+      this.brandPrefix(colors.brandColor);
+    }
     this.logMessage(LogLevel.Info, message, null);
   }
 
-  warn(...message: any[]): void {
-    this.brandPrefix(yellow);
-    this.logMessage(LogLevel.Warn, message, yellow);
+  warn(message: string): void {
+    this.brandPrefix(colors.yellow);
+    this.logMessage(LogLevel.Warn, message, colors.yellow);
   }
 
-  error(...message: any[]): void {
-    this.brandPrefix(red);
-    this.logMessage(LogLevel.Error, message, red);
+  error(message: string | Error, errorOptions?: ErrorOptions): void {
+    this.brandPrefix(colors.red);
+    this.logMessage(LogLevel.Error, message, colors.red);
 
-    if (this.options?.exit) {
+    const effectiveOptions = { ...this.options, ...errorOptions };
+
+    if (effectiveOptions.exit) {
       process.exit(1);
     }
   }
-  infoOnce(...message: any[]) {
-    if (!warnOnceMessages.has(message[0])) {
-      infoOnceMessages.add(message.join(' '));
-      this.info(...message);
+  infoOnce(message: string) {
+    if (!infoOnceMessages.has(message)) {
+      infoOnceMessages.add(message);
+      this.info(message);
     }
   }
-  warnOnce(...message: any[]) {
-    if (!warnOnceMessages.has(message[0])) {
-      warnOnceMessages.add(message.join(' '));
-      this.warn(...message);
+  warnOnce(message: string) {
+    if (!warnOnceMessages.has(message)) {
+      warnOnceMessages.add(message);
+      this.warn(message);
     }
   }
-  errorOnce(...message: any[]) {
-    if (!warnOnceMessages.has(message[0])) {
-      errorOnceMessages.add(message.join(' '));
-      this.error(...message);
+  errorOnce(message: string | Error) {
+    if (!errorOnceMessages.has(message)) {
+      errorOnceMessages.add(message);
+      this.error(message);
     }
   }
 }
 
 export function printServerUrls(urls: any, logger: Logger): void {
   const colorUrl = (url: string) =>
-    cyan(url.replace(/:(\d+)\//, (_, port) => `:${bold(port)}/`));
+    colors.cyan(url.replace(/:(\d+)\//, (_, port) => `:${colors.bold(port)}/`));
 
   const logUrl = (url: string, type: string) =>
-    logger.info(`${bold(magenta('>'))} ${bold(type)}${bold(colorUrl(url))}`);
+    logger.info(
+      `${colors.bold(colors.magenta('>'))} ${colors.bold(type)}${colors.bold(
+        colorUrl(url)
+      )}`
+    );
 
   urls.local.map((url: string) => logUrl(url, 'Local:   '));
   urls.network.map((url: string) => logUrl(url, 'Network: '));
@@ -162,7 +170,7 @@ export function bootstrapLogger(options?: LoggerOptions): Logger {
 export function bootstrap(times: number, config: Config) {
   const usePersistentCache = config.config.persistentCache;
   const persistentCacheFlag = usePersistentCache
-    ? bold(PersistentCacheBrand)
+    ? colors.bold(PersistentCacheBrand)
     : '';
   const version = JSON.parse(
     readFileSync(
@@ -170,11 +178,14 @@ export function bootstrap(times: number, config: Config) {
       'utf-8'
     )
   ).version;
-  console.log('\n', bold(brandColor(`${'ϟ'}  Farm  v${version}`)));
   console.log(
-    `${bold(green(` ✓`))}  ${bold('Ready in')} ${bold(
-      green(`${times}ms`)
-    )} ${persistentCacheFlag}`,
+    '\n',
+    colors.bold(colors.brandColor(`${'ϟ'}  Farm  v${version}`))
+  );
+  console.log(
+    `${colors.bold(colors.green(` ✓`))}  ${colors.bold(
+      'Ready in'
+    )} ${colors.bold(colors.green(`${times}ms`))} ${persistentCacheFlag}`,
     '\n'
   );
 }

@@ -1,5 +1,43 @@
 # @farmfe/core
 
+## 0.14.18
+
+### Patch Changes
+
+- b181bb1c: support linux-x64-musl
+
+## 0.14.17
+
+### Patch Changes
+
+- 329d37ef: fix enforceTargetMinSize panic
+
+## 0.14.16
+
+### Patch Changes
+
+- 88a93d0a: Fix duplicate `/` in css url()
+
+## 0.14.15
+
+### Patch Changes
+
+- 19c600d2: Fix win ia32 artifact not found
+- 478c685f: update brand color update logger logic
+
+## 0.14.14
+
+### Patch Changes
+
+- 0b022e7a: bug: PublicPath parsing error while setting server.open
+- 418247f3: Optimize cache
+
+## 0.14.13
+
+### Patch Changes
+
+- cfc5cfa2: Fix #814
+
 ## 0.14.12
 
 ### Patch Changes

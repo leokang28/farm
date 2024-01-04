@@ -223,8 +223,9 @@ pub struct ScriptModuleMetaData {
   pub top_level_mark: u32,
   pub unresolved_mark: u32,
   pub module_system: ModuleSystem,
-  /// true if this module calls `import.meta.hot.accept`
-  pub hmr_accepted: bool,
+  /// true if this module calls `import.meta.hot.accept()` or `import.meta.hot.accept(mod => {})`
+  pub hmr_self_accepted: bool,
+  pub hmr_accepted_deps: HashSet<ModuleId>,
 }
 
 impl Default for ScriptModuleMetaData {
@@ -238,7 +239,8 @@ impl Default for ScriptModuleMetaData {
       top_level_mark: 0,
       unresolved_mark: 0,
       module_system: ModuleSystem::EsModule,
-      hmr_accepted: false,
+      hmr_self_accepted: false,
+      hmr_accepted_deps: Default::default(),
     }
   }
 }
@@ -388,11 +390,8 @@ impl ToString for ModuleType {
 
 /// Abstract ModuleId from the module's resolved id
 #[cache_item]
-#[derive(
-  PartialEq, Eq, Hash, Clone, Debug, PartialOrd, Ord, serde::Serialize, serde::Deserialize,
-)]
+#[derive(PartialEq, Eq, Hash, Clone, Debug, PartialOrd, Ord)]
 #[archive_attr(derive(Hash, Eq, PartialEq))]
-#[serde(rename_all = "camelCase")]
 pub struct ModuleId {
   relative_path: String,
   query_string: String,
@@ -502,6 +501,26 @@ impl From<String> for ModuleId {
 impl ToString for ModuleId {
   fn to_string(&self) -> String {
     self.relative_path.to_string() + self.query_string.as_str()
+  }
+}
+
+impl<'de> serde::Deserialize<'de> for ModuleId {
+  fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+  where
+    D: serde::Deserializer<'de>,
+  {
+    let s = <std::string::String as serde::Deserialize>::deserialize(deserializer)?;
+
+    Ok(ModuleId::from(s))
+  }
+}
+
+impl serde::Serialize for ModuleId {
+  fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+  where
+    S: serde::Serializer,
+  {
+    serializer.serialize_str(self.to_string().as_str())
   }
 }
 

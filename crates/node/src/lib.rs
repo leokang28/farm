@@ -2,7 +2,6 @@
 #![allow(clippy::redundant_allocation)]
 use std::{
   collections::HashMap,
-  f32::consts::E,
   path::{Path, PathBuf},
   sync::Arc,
 };
@@ -365,6 +364,24 @@ impl JsCompiler {
     module_graph.has_module(&module_id)
       || watch_graph.has_module(&module_id)
       || !module_ids_by_file.is_empty()
+  }
+
+  #[napi]
+  pub fn get_parent_files(&self, resolved_path: String) -> Vec<String> {
+    let context = self.compiler.context();
+    let module_graph = context.module_graph.read();
+    let path = Path::new(&resolved_path);
+    let module_id = if path.is_absolute() {
+      ModuleId::from_resolved_path_with_query(&resolved_path, &context.config.root)
+    } else {
+      resolved_path.into()
+    };
+    let parents = module_graph.dependents_ids(&module_id);
+
+    parents
+      .into_iter()
+      .map(|p| p.resolved_path_with_query(&context.config.root))
+      .collect()
   }
 
   #[napi]

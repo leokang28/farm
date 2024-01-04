@@ -1,41 +1,25 @@
 import { isArray, isObject } from '../utils/index.js';
-import { convertPlugin, handleVitePlugins } from './js/index.js';
+import { convertPlugin } from './js/index.js';
 import { rustPluginResolver } from './rust/index.js';
 
 import type { JsPlugin } from './type.js';
-import type { Config } from '../../binding/index.js';
-import { type UserConfig } from '../config/index.js';
+import { ResolvedUserConfig, type UserConfig } from '../config/index.js';
 import merge from 'lodash.merge';
 
 export * from './js/index.js';
 export * from './rust/index.js';
 
-/**
- * resolvePlugins split / jsPlugins / rustPlugins
- * @param config
- */
-export async function resolveAllPlugins(
-  finalConfig: Config['config'],
-  userConfig: UserConfig
-) {
-  const plugins = userConfig.plugins ?? [];
-  const vitePlugins = (userConfig.vitePlugins ?? []).filter(Boolean);
+export async function resolveFarmPlugins(config: UserConfig) {
+  const plugins = config.plugins ?? [];
 
-  if (!plugins.length && !vitePlugins?.length) {
+  if (!plugins.length) {
     return {
       rustPlugins: [],
-      jsPlugins: [],
-      finalConfig
+      jsPlugins: []
     };
   }
 
   const rustPlugins = [];
-
-  const vitePluginAdapters: JsPlugin[] = handleVitePlugins(
-    vitePlugins,
-    userConfig,
-    finalConfig
-  );
 
   const jsPlugins: JsPlugin[] = [];
 
@@ -45,7 +29,7 @@ export async function resolveAllPlugins(
       (isArray(plugin) && typeof plugin[0] === 'string')
     ) {
       rustPlugins.push(
-        await rustPluginResolver(plugin as string, finalConfig.root)
+        await rustPluginResolver(plugin as string, config.root ?? process.cwd())
       );
     } else if (isObject(plugin)) {
       convertPlugin(plugin as unknown as JsPlugin);
@@ -61,101 +45,10 @@ export async function resolveAllPlugins(
       );
     }
   }
-  // vite plugins execute after farm plugins by default.
-  jsPlugins.push(...vitePluginAdapters);
-
-  // call user config hooks
-  for (const jsPlugin of jsPlugins) {
-    finalConfig = (await jsPlugin.config?.(finalConfig)) ?? finalConfig;
-  }
 
   return {
     rustPlugins,
-    jsPlugins,
-    finalConfig
-  };
-}
-
-export async function resolveJsPlugins(
-  finalConfig: Config['config'],
-  userConfig: UserConfig
-) {
-  const plugins = userConfig.plugins ?? [];
-  const vitePlugins = (userConfig.vitePlugins ?? []).filter(Boolean);
-
-  if (!plugins.length && !vitePlugins?.length) {
-    return {
-      jsPlugins: [],
-      finalConfig
-    };
-  }
-
-  const vitePluginAdapters: JsPlugin[] = handleVitePlugins(
-    vitePlugins,
-    userConfig,
-    finalConfig
-  );
-
-  const jsPlugins: JsPlugin[] = [];
-
-  for (const plugin of plugins) {
-    if (
-      typeof plugin === 'string' ||
-      (isArray(plugin) && typeof plugin[0] === 'string')
-    ) {
-      // Ignore or handle the string or specific array format
-      continue;
-    }
-    if (isObject(plugin)) {
-      convertPlugin(plugin as unknown as JsPlugin);
-      jsPlugins.push(plugin as unknown as JsPlugin);
-    } else if (isArray(plugin)) {
-      for (const pluginNestItem of plugin as JsPlugin[]) {
-        convertPlugin(pluginNestItem as JsPlugin);
-        jsPlugins.push(pluginNestItem as JsPlugin);
-      }
-    } else {
-      throw new Error(
-        `plugin ${plugin} is not supported, Please pass the correct plugin type`
-      );
-    }
-  }
-  // vite plugins execute after farm plugins by default.
-  jsPlugins.push(...vitePluginAdapters);
-
-  return {
-    jsPlugins,
-    finalConfig
-  };
-}
-
-export async function resolveRustPlugins(
-  compilationConfig: Config['config'],
-  userConfig: UserConfig
-) {
-  const plugins = userConfig.plugins ?? [];
-
-  if (!plugins.length) {
-    return {
-      rustPlugins: []
-    };
-  }
-
-  const rustPlugins = [];
-
-  for (const plugin of plugins) {
-    if (
-      typeof plugin === 'string' ||
-      (isArray(plugin) && typeof plugin[0] === 'string')
-    ) {
-      rustPlugins.push(
-        await rustPluginResolver(plugin as string, compilationConfig.root)
-      );
-    }
-  }
-
-  return {
-    rustPlugins
+    jsPlugins
   };
 }
 
@@ -176,26 +69,8 @@ export async function resolveAsyncPlugins<T>(arr: T[]): Promise<T[]> {
   }, Promise.resolve([]));
 }
 
-export function filterPluginByName(plugins: JsPlugin[]) {
-  const uniqueNamesSet = new Set();
-
-  // 使用 Array.filter 进行过滤
-  const filteredArray = plugins.filter((obj) => {
-    // 如果 Set 中没有出现过当前对象的 name 值，加入 Set，并保留该对象
-    if (!uniqueNamesSet.has(obj.name)) {
-      uniqueNamesSet.add(obj.name);
-      return true;
-    }
-    // 如果 Set 中已经出现过相同的 name 值，过滤掉该对象
-    return false;
-  });
-
-  return filteredArray;
-}
-
 export async function resolveConfigHook(
   config: UserConfig,
-  // configEnv: ConfigEnv,
   plugins: JsPlugin[]
 ): Promise<UserConfig> {
   let conf = config;
@@ -211,9 +86,7 @@ export async function resolveConfigHook(
   }
 
   for (const p of uniqueVitePlugins.values()) {
-    const hook = p.config;
-
-    if (hook) {
+    if (p.config) {
       const res = await p.config(conf);
 
       if (res) {
@@ -226,21 +99,18 @@ export async function resolveConfigHook(
 }
 
 export async function resolveConfigResolvedHook(
-  config: any,
-  plugins: any[]
-): Promise<UserConfig> {
-  const conf = config;
-
+  config: ResolvedUserConfig,
+  plugins: JsPlugin[]
+) {
   for (const p of plugins) {
-    const hook = p.configResolved;
-    if (hook) {
-      await p.configResolved(conf.config);
+    if (p.configResolved) {
+      await p.configResolved(config);
     }
   }
-  return conf;
 }
 
 export function getSortedPlugins(plugins: readonly JsPlugin[]): JsPlugin[] {
+  // TODO The priority needs to be redefined.
   const DEFAULT_PRIORITY = 100;
 
   const sortedPlugins = plugins
@@ -253,14 +123,23 @@ export function getSortedPlugins(plugins: readonly JsPlugin[]): JsPlugin[] {
   const prePlugins = sortedPlugins.filter(
     (plugin) => plugin?.priority > DEFAULT_PRIORITY
   );
+
   const postPlugins = sortedPlugins.filter(
     (plugin) => plugin?.priority < DEFAULT_PRIORITY
   );
 
   const normalPlugins = plugins.filter(
     (plugin) =>
-      typeof plugin === 'object' && typeof plugin.priority !== 'number'
+      (typeof plugin === 'object' && typeof plugin.priority !== 'number') ||
+      plugin?.priority === DEFAULT_PRIORITY
   );
 
   return [...prePlugins, ...normalPlugins, ...postPlugins];
+}
+
+export function getSortedPluginHooks(
+  plugins: JsPlugin[],
+  hookName: keyof JsPlugin
+): any {
+  return plugins.map((p: JsPlugin) => p[hookName]).filter(Boolean);
 }

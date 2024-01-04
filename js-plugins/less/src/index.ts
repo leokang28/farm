@@ -1,4 +1,4 @@
-import { DevServer, JsPlugin, UserConfig } from '@farmfe/core';
+import { Compiler, JsPlugin, UserConfig } from '@farmfe/core';
 import {
   getLessImplementation,
   pluginName,
@@ -24,19 +24,25 @@ export default function farmLessPlugin(
   options: LessPluginOptions = {}
 ): JsPlugin {
   let farmConfig: UserConfig['compilation'];
-  let devServer: DevServer;
+  let compiler: Compiler;
   const implementation: LessStatic = getLessImplementation(
     options?.implementation
   );
 
   return {
     name: pluginName,
-    config: (config) => {
-      farmConfig = config;
-      return config;
+    configResolved: (config) => {
+      farmConfig = config.compilation;
     },
-    configDevServer(server) {
-      devServer = server;
+    // eslint-disable-next-line @typescript-eslint/ban-ts-comment
+    // @ts-ignore it will be removed in the future
+    configDevServer() {
+      console.warn(
+        '[@farmfe/js-plugin-less] Your plugin version is not compatible with the current farm version, please update @farmfe/core to the latest version, otherwise the plugin may not work properly.'
+      );
+    },
+    configureCompiler(c) {
+      compiler = c;
     },
     load: {
       filters: {
@@ -95,10 +101,9 @@ export default function farmLessPlugin(
             paths: configPaths ? [fileRoot, ...configPaths] : [fileRoot]
           } as Less.Options);
 
-          if (devServer && imports && !isProd) {
+          if (compiler && imports && !isProd) {
             for (const dep of imports) {
-              // TODO add a compilerCreated hook to farmfe/core and get the compiler instead of using devServer
-              devServer.addWatchFile(param.resolvedPath, [
+              compiler.addExtraWatchFile(param.resolvedPath, [
                 path.resolve(fileRoot, dep)
               ]);
             }

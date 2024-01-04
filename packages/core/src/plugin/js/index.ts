@@ -1,9 +1,9 @@
 import merge from 'lodash.merge';
-import { Config } from '../../../binding/index.js';
 import {
   type JsPlugin,
   normalizeDevServerOptions,
-  type UserConfig
+  type UserConfig,
+  Logger
 } from '../../index.js';
 import {
   DEFAULT_FILTERS,
@@ -12,6 +12,7 @@ import {
 } from './utils.js';
 import { VitePluginAdapter } from './vite-plugin-adapter.js';
 import { existsSync, readFileSync } from 'node:fs';
+import { resolveAsyncPlugins } from '../index.js';
 
 // export * from './jsPluginAdapter.js';
 export { VitePluginAdapter } from './vite-plugin-adapter.js';
@@ -19,30 +20,35 @@ export { VitePluginAdapter } from './vite-plugin-adapter.js';
 type VitePluginType = object | (() => { vitePlugin: any; filters: string[] });
 type VitePluginsType = VitePluginType[];
 
-export function handleVitePlugins(
+export async function handleVitePlugins(
   vitePlugins: VitePluginsType,
   userConfig: UserConfig,
-  finalConfig: Config['config']
-): JsPlugin[] {
+  logger: Logger
+): Promise<JsPlugin[]> {
   const jsPlugins: JsPlugin[] = [];
 
   if (vitePlugins.length) {
     userConfig = merge({}, userConfig, {
-      compilation: finalConfig,
-      server: normalizeDevServerOptions(userConfig.server, finalConfig.mode)
+      compilation: userConfig.compilation,
+      server: normalizeDevServerOptions(
+        userConfig.server,
+        userConfig.compilation?.mode ?? 'development'
+      )
     });
   }
+  const flatVitePlugins = await resolveAsyncPlugins(vitePlugins);
 
-  for (const vitePluginObj of vitePlugins) {
+  for (const vitePluginObj of flatVitePlugins) {
     let vitePlugin = vitePluginObj,
-      filters = DEFAULT_FILTERS;
+      filters = ['.+'];
 
     if (typeof vitePluginObj === 'function') {
       const { vitePlugin: plugin, filters: f } = vitePluginObj();
       vitePlugin = plugin;
       filters = f;
     }
-    processVitePlugin(vitePlugin, userConfig, filters, jsPlugins);
+
+    processVitePlugin(vitePlugin, userConfig, filters, jsPlugins, logger);
   }
 
   // if vitePlugins is not empty, append a load plugin to load file
@@ -87,7 +93,7 @@ export function handleVitePlugins(
           if (VitePluginAdapter.isFarmInternalVirtualModule(resolvedPath)) {
             return null;
           }
-          const cssModules = finalConfig?.css?.modules?.paths ?? [
+          const cssModules = userConfig.compilation?.css?.modules?.paths ?? [
             '\\.module\\.(css|less|sass|scss)$'
           ];
           // skip css module because it will be handled by Farm
@@ -120,13 +126,15 @@ export function processVitePlugin(
   vitePlugin: VitePluginType,
   userConfig: UserConfig,
   filters: string[],
-  jsPlugins: JsPlugin[]
+  jsPlugins: JsPlugin[],
+  logger: Logger
 ) {
   const processPlugin = (plugin: any) => {
     const vitePluginAdapter = new VitePluginAdapter(
       plugin as any,
       userConfig,
-      filters
+      filters,
+      logger
     );
     convertPlugin(vitePluginAdapter);
     jsPlugins.push(vitePluginAdapter);

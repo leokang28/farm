@@ -12,7 +12,6 @@ export async function getCompiler(
   input?: Record<string, string>
 ): Promise<Compiler> {
   const compilationConfig = await normalizeUserCompilationConfig(
-    null,
     {
       root,
       compilation: {
@@ -28,16 +27,17 @@ export async function getCompiler(
         sourcemap: false,
         persistentCache: false
       },
-      server: {
-        hmr: false
-      },
       plugins
     },
     new DefaultLogger(),
     'production'
   );
 
-  return new Compiler(compilationConfig);
+  return new Compiler({
+    config: compilationConfig,
+    jsPlugins: plugins,
+    rustPlugins: []
+  });
 }
 
 export function getFixturesDir() {

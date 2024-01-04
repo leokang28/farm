@@ -5,11 +5,12 @@ use farmfe_utils::stringify_query;
 use rayon::iter::{IntoParallelRefIterator, ParallelIterator};
 
 use super::{
-  Plugin, PluginAnalyzeDepsHookParam, PluginDriverRenderResourcePotHookResult,
-  PluginFinalizeModuleHookParam, PluginGenerateResourcesHookResult, PluginHookContext,
-  PluginLoadHookParam, PluginLoadHookResult, PluginParseHookParam, PluginProcessModuleHookParam,
-  PluginRenderResourcePotHookParam, PluginResolveHookParam, PluginResolveHookResult,
-  PluginTransformHookParam, PluginUpdateModulesHookParams,
+  ChunkResourceInfo, Plugin, PluginAnalyzeDepsHookParam, PluginDriverRenderResourcePotHookResult,
+  PluginFinalizeModuleHookParam, PluginFinalizeResourcesHookParams,
+  PluginGenerateResourcesHookResult, PluginHookContext, PluginLoadHookParam, PluginLoadHookResult,
+  PluginParseHookParam, PluginProcessModuleHookParam, PluginRenderResourcePotHookParam,
+  PluginResolveHookParam, PluginResolveHookResult, PluginTransformHookParam,
+  PluginUpdateModulesHookParams,
 };
 use crate::{
   config::Config,
@@ -90,7 +91,7 @@ macro_rules! hook_parallel {
     }
   };
 
-  ($func_name:ident, $callback:expr, $($arg:ident: $ty:ty),+) => {
+  ($func_name:ident, $($arg:ident: $ty:ty),+ ,$callback:expr) => {
     pub fn $func_name(&self, $($arg: $ty),+, context: &Arc<CompilationContext>) -> Result<()> {
       self
         .plugins
@@ -133,7 +134,7 @@ impl PluginDriver {
 
   hook_parallel!(
     build_start,
-    |plugin_name: String, context: &Arc<CompilationContext>| {
+    |_plugin_name: String, _context: &Arc<CompilationContext>| {
       // todo something
     }
   );
@@ -410,6 +411,14 @@ impl PluginDriver {
     }
   );
 
+  hook_serial!(render_start, &Config, |_plugin_name: String,
+                                       _config: &Config,
+                                       _context: &Arc<
+    CompilationContext,
+  >| {
+    // todo something
+  });
+
   hook_first!(
     render_resource_pot_modules,
     Result<Option<ResourcePotMetaData>>,
@@ -430,23 +439,44 @@ impl PluginDriver {
     param: &mut PluginRenderResourcePotHookParam,
     context: &Arc<CompilationContext>,
   ) -> Result<PluginDriverRenderResourcePotHookResult> {
-    let mut result = PluginDriverRenderResourcePotHookResult {
-      content: Arc::new(String::new()),
-      source_map_chain: vec![],
-    };
-
     for plugin in &self.plugins {
       // if the transform hook returns None, treat it as empty hook and ignore it
       if let Some(plugin_result) = plugin.render_resource_pot(param, context)? {
         param.content = Arc::new(plugin_result.content);
 
         if let Some(source_map) = plugin_result.source_map {
-          result.source_map_chain.push(Arc::new(source_map));
+          param.source_map_chain.push(Arc::new(source_map));
         }
       }
     }
 
-    result.content = param.content.clone();
+    let result = PluginDriverRenderResourcePotHookResult {
+      content: param.content.clone(),
+      source_map_chain: param.source_map_chain.clone(),
+    };
+
+    Ok(result)
+  }
+
+  pub fn augment_resource_hash(
+    &self,
+    render_pot_info: &ChunkResourceInfo,
+    context: &Arc<CompilationContext>,
+  ) -> Result<Option<String>> {
+    let mut result: Option<String> = None;
+
+    for plugin in &self.plugins {
+      if let Some(plugin_result) = plugin.augment_resource_hash(render_pot_info, context)? {
+        match result {
+          Some(ref mut result) => {
+            result.push_str(plugin_result.as_str());
+          }
+          None => {
+            result = Some(plugin_result);
+          }
+        }
+      }
+    }
 
     Ok(result)
   }
@@ -506,12 +536,13 @@ impl PluginDriver {
 
   hook_serial!(
     finalize_resources,
-    &mut HashMap<String, Resource>,
-    |plugin_name: String,
-     param: &mut HashMap<String, Resource>,
-     context: &Arc<CompilationContext>| {
-    // todo something
-  });
+    &mut PluginFinalizeResourcesHookParams,
+    |_plugin_name: String,
+     _param: &mut PluginFinalizeResourcesHookParams,
+     _context: &Arc<CompilationContext>| {
+      // todo something
+    }
+  );
 
   hook_parallel!(
     generate_end,
@@ -522,10 +553,10 @@ impl PluginDriver {
 
   hook_parallel!(
     finish,
+    stat: &Stats,
     |plugin_name: String, context: &Arc<CompilationContext>| {
       context.record_manager.set_trigger(Trigger::Update);
-    },
-    stat: &Stats
+    }
   );
 
   hook_serial!(

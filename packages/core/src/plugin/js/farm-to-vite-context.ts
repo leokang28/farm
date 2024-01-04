@@ -1,7 +1,6 @@
 import type { PluginContext } from 'rollup';
 import type { UserConfig } from '../../config/types.js';
 import type { CompilationContext } from '../type.js';
-import { relative } from 'path';
 import { DefaultLogger } from '../../utils/logger.js';
 
 const contextCache = new Map<string, PluginContext>();
@@ -115,7 +114,7 @@ export function farmContextToViteContext(
     },
     meta: {
       rollupVersion: '3.29.4',
-      watchMode: config.compilation.mode !== 'production'
+      watchMode: config.compilation?.mode !== 'production'
     },
     parse: (_) => {
       throw new Error(
@@ -130,10 +129,7 @@ export function farmContextToViteContext(
       const farmResolveResult = await farmContext.resolve(
         {
           source,
-          importer: {
-            relativePath: relative(config.root, importer),
-            queryString: importer.split('?')[1] ?? ''
-          },
+          importer,
           kind: options.isEntry ? 'entry' : 'import'
         },
         {

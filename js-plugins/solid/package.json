@@ -12,7 +12,7 @@
   "type": "module",
   "exports": {
     ".": {
-      "import": "./build/esm/index.js",
+      "import": "./build/esm/index.mjs",
       "types": "./build/cjs/index.d.ts",
       "require": "./build/cjs/index.cjs",
       "default": "./build/cjs/index.cjs"
@@ -41,7 +41,7 @@
     "solid-js": "^1.7.8"
   },
   "peerDependencies": {
-    "@farmfe/core": "^0.14.12"
+    "@farmfe/core": "^0.14.18"
   },
   "files": [
     "dist"

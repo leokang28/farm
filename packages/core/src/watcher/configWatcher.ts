@@ -1,27 +1,32 @@
-import { Config, JsFileWatcher } from '../../binding/index.js';
+import { JsFileWatcher } from '../../binding/index.js';
 import { ResolvedUserConfig } from '../config/index.js';
-
-interface WatcherOptions {
-  config: Config;
-  userConfig: ResolvedUserConfig;
-}
 
 export class ConfigWatcher {
   private watcher: JsFileWatcher;
   private _close = false;
 
-  constructor(private options: WatcherOptions) {}
+  constructor(private resolvedUserConfig: ResolvedUserConfig) {
+    if (!resolvedUserConfig) {
+      throw new Error(
+        'Invalid resolvedUserConfig provided to Farm JsConfigWatcher'
+      );
+    }
+  }
 
   watch(callback: (file: string[]) => void) {
     async function handle(file: string[]) {
       callback(file);
     }
 
-    const watchedFiles = [
-      ...(this.options.config.config.envFiles ?? []),
-      ...(this.options.userConfig.configFileDependencies ?? []),
-      this.options.userConfig.resolveConfigPath
-    ];
+    const watchedFilesSet = new Set<string>([
+      ...(this.resolvedUserConfig.envFiles ?? []),
+      ...(this.resolvedUserConfig.configFileDependencies ?? []),
+      ...(this.resolvedUserConfig.configFilePath
+        ? [this.resolvedUserConfig.configFilePath]
+        : [])
+    ]);
+
+    const watchedFiles = Array.from(watchedFilesSet).filter(Boolean);
 
     this.watcher = new JsFileWatcher((paths: string[]) => {
       if (this._close) return;
