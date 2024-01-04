@@ -1,5 +1,17 @@
 # @farmfe/js-plugin-vue
 
+## 3.2.1
+
+### Patch Changes
+
+- e4c9f81: Break change: reset config and configResolved hooks hook functionality and structure
+- e91a088: hmr cannot be disabled in development mode
+- Updated dependencies [e4c9f81]
+- Updated dependencies [e91a088]
+- Updated dependencies [78c1957]
+- Updated dependencies [8846d06]
+  - @farmfe/core@0.14.19
+
 ## 3.2.0
 
 ### Minor Changes

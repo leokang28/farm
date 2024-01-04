@@ -1,5 +1,11 @@
 # @farmfe/cli
 
+## 0.5.12
+
+### Patch Changes
+
+- e4c9f81: optimize cli code
+
 ## 0.5.11
 
 ### Patch Changes

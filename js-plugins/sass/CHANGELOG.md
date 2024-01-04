@@ -1,5 +1,17 @@
 # @farmfe/js-plugin-sass
 
+## 2.2.1
+
+### Patch Changes
+
+- 78c1957: change importer type
+- e4c9f81: Break change: reset config and configResolved hooks hook functionality and structure
+- Updated dependencies [e4c9f81]
+- Updated dependencies [e91a088]
+- Updated dependencies [78c1957]
+- Updated dependencies [8846d06]
+  - @farmfe/core@0.14.19
+
 ## 2.2.0
 
 ### Minor Changes
